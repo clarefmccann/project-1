@@ -25,12 +25,17 @@ packages <-  c("tidyverse", "lavaan",
 lapply(packages, library, character.only = TRUE)
 ```
 
+```{r Define Root Path}
+
+root_path="~/Users/local/"
+
+```
 
 
+```{r Load data sets}
 
-Load datasets
-```{r}
 ##pulling CSV files & calculating cronbach alpha
+
 CAMM_W1<-read.csv(paste0(root_path,"CAMM_Wave1.csv"),
                   stringsAsFactors = FALSE) %>%
               select(id, CAMM_W1)
@@ -93,26 +98,6 @@ School_Transitions <- read.csv(paste0(root_path,"Grade Transitions CM Honors.csv
                                stringsAsFactors = FALSE) %>% 
   select(id, Transitioned_W1, Transitioned_W2, Transitioned_W3)
 
-#School_Transitions <-na.omit(School_Transitions)
-#Removing underscores from id
-
-School_Transitions <-School_Transitions %>%
-  mutate(no_underscores=paste0("id",
-                               substring(id,first=5,last=length(id))))
-
-#Reorganizing columns 
-School_Transitions <- School_Transitions[,-1]
-School_Transitions <- School_Transitions[c(4,1,2,3)]
-colnames(School_Transitions)[1] <- "id"
-  
-#coding for transitions 
-# 1 = transitioned to middle school 
-# 2 = transitioned to high school 
-# 0 = no transition prior to wave 
-
-
-## loading in grade data
-
 Grades_W1 <-read.csv(paste0(root_path,"W1_School_Info.csv"),
                   stringsAsFactors = FALSE)  %>%
               select(id, Grades_Average)
@@ -127,24 +112,33 @@ Grades_W3 <-read.csv(paste0(root_path,"W3_School_Info.csv"),
 
 Grades_W1$Grades_Average
 
-## removing underscores from ID 
+#School_Transitions <-na.omit(School_Transitions)
+
+#Removing underscores from id
+
+School_Transitions <-School_Transitions %>%
+  mutate(no_underscores=paste0("id",
+                               substring(id,first=5,last=length(id))))
 
 Grades_W1 <-Grades_W1 %>%
-  mutate(no_underscores=paste0("ID",
+  mutate(no_underscores=paste0("TAG",
                                substring(id,first=5,last=length(id))))
 Grades_W2 <-Grades_W2 %>%
-  mutate(no_underscores=paste0("ID",
+  mutate(no_underscores=paste0("TAG",
                                substring(id,first=5,last=length(id))))
 Grades_W3 <-Grades_W3 %>%
-  mutate(no_underscores=paste0("ID",
+  mutate(no_underscores=paste0("TAG",
                                substring(id,first=5,last=length(id))))
 
-# cleaning data set
+#Reorganizing columns 
 
+School_Transitions <- School_Transitions[,-1]
+School_Transitions <- School_Transitions[c(4,1,2,3)]
+colnames(School_Transitions)[1] <- "id"
+  
 Grades_W1 <- Grades_W1[,-1]
 Grades_W2 <- Grades_W2[,-1]
 Grades_W3 <- Grades_W3[,-1]
-
 Grades_W1 <- Grades_W1[c(2,1)]
 Grades_W2 <- Grades_W2[c(2,1)]
 Grades_W3 <- Grades_W3[c(2,1)]
@@ -160,11 +154,11 @@ Grades_W3$Grades_Average <- as.character(Grades_W3$Grades_Average)
 colnames(Grades_W1)[2] <- "Grades_W1"
 colnames(Grades_W2)[2] <- "Grades_W2"
 colnames(Grades_W3)[2] <- "Grades_W3"
-
 ```
 
-Make long datasets
-```{r}
+
+```{r Make long datasets}
+
 #Creating Long Data Set for MLM 
 
 CAMM_long<-full_join(CAMM_W1,full_join(CAMM_W2,CAMM_W3)) %>%
@@ -194,6 +188,7 @@ full_dataset<-full_join(SchoolTransitions_long,full_dataset,by=c("id", "wave")) 
   distinct(.)
 
 Age <- Age %>% mutate(wave = substr(wave, 2, 2))
+
 full_dataset <- full_join(full_dataset, Age, by=c("id", "wave")) %>%
   distinct(.)
 
@@ -204,8 +199,8 @@ full_dataset <- full_join(full_dataset, Menarche, by=c("id")) %>%
   distinct(.)
 
 # remove rows without School Transitions data
-full_dataset <- full_dataset[is.na(full_dataset$Transition) == FALSE, ]
 
+full_dataset <- full_dataset[is.na(full_dataset$Transition) == FALSE, ]
 
 full_dataset <- distinct(full_dataset)
 
@@ -238,18 +233,24 @@ full_dataset<-full_dataset%>%
          CAMM_lag=ifelse(wave==2,CAMM_lag.x,
                        ifelse(wave==3,CAMM_lag.y,
                               NA)))
+
+full_dataset <- na_if(full_dataset, "-3")
+full_dataset <- na_if(full_dataset, "-9")
+
 #removing extra columns
 
 full_dataset<-full_dataset %>%
   select(-SC_lag.x,-SC_lag.y,-CAMM_lag.x,-CAMM_lag.y)
 ```
 
-```{r}
+```{r Data cleaning}
+
 ##organizing data
 
-#reording columns
+#reordering columns
 
 full_dataset <- full_dataset[c(1,3,2,4,5,6,7,8,9,10,11)]
+
 # renaming columns 
 
 colnames(full_dataset)[8] <- "SES"
@@ -258,20 +259,19 @@ colnames(full_dataset)[7]<- "Age_at_Wave"
 
 full_dataset$SES <- as.numeric(full_dataset$SES)
 
-# removing N/A 
-
+# removing N/A
 full_dataset <- full_dataset %>% mutate(SES = na_if(SES, 7))
 full_dataset <- full_dataset %>% mutate(Grades = na_if(Grades, -9))
+
+## changing classes of vars
 full_dataset$SES<-ordered(as.factor(full_dataset$SES))
 full_dataset$Transition <- as.factor(full_dataset$Transition)
 full_dataset$id <- as.factor(full_dataset$id)
 full_dataset$wave <- as.factor(full_dataset$wave)
 full_dataset$Grades <- as.factor(full_dataset$Grades)
-
 str(full_dataset)
 
 # chunking SES brackets, 1&2 = lower income (1), 3=median (2), 4&5=high (3)
-
 full_dataset <- full_dataset%>%
   mutate(SES=ifelse(SES==2, "Low",
                            ifelse(SES==3, "Middle",
@@ -281,6 +281,7 @@ full_dataset <- full_dataset%>%
                               SES)))))) %>%
   mutate(SES=as.factor(SES)) 
 
+## changing grade var to be readable 
 full_dataset <- full_dataset %>%
   mutate(Grades=ifelse(Grades==1, "A",
                            ifelse(Grades==2, "B",
@@ -289,509 +290,35 @@ full_dataset <- full_dataset %>%
                                                 ifelse(Grades==5,"NP",
                               Grades)))))) %>%
   mutate(Grades=as.factor(Grades))
-  
 
-```
-
-
-Analysis
-```{r}
-# making a mean centered age variable 
-
+# making a mean centered age variable
 full_dataset$agecenter<-(full_dataset$Age_at_Wave-12.5)
 full_dataset$agecenter.sq<-(full_dataset$agecenter*full_dataset$agecenter)
 
-#Q1: Does self-perceived scholastic competence change across early adolescence in girls?  
+# Transition re-coded 0=1, 1=2, 0=2=0 and then 1=TranMiddle; 0=NoTran; 2=TranHigh
 
-null_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche)))
-
-lin_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche)))
-summary(lin_model_SC_age_cov)
-
-quad_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter+agecenter.sq,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                             filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche)))
-summary(quad_model_SC_age_cov)
-anova(null_model_SC_age_cov,quad_model_SC_age_cov, lin_model_SC_age_cov)
-
-# graph for question 1 
-
-age_by_SC<-ggplot(data=full_dataset,
-       aes(x=Age_at_Wave,
-           y=SC))+
-  xlim(9.5,16.5)+
-  xlab("Age (years)")+
-  ylim(5,20)+
-  ylab("Scholastic Competence")+
-  geom_line(aes(group=id),size=.5,alpha=0.3,colour="#82204A")+
-  geom_point(aes(group=id),size=3,alpha=0.3,colour="#82204A")+
-  theme(axis.title = element_text(face = "bold")) + 
-  theme_minimal()
-  
-age_by_SC
-
-# saving graph as tiff
-
-ggsave("Age_by_SC.tiff", width= 6, height=4, units= 'in', dpi=600, bg = "transparent")
-
-# question 1 without covariates
-null_model_SC_age<-lme(SC ~ 1,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter)))
-lin_model_SC_age<-lme(SC ~ agecenter,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter)))
-
-quad_model_SC_age<-lme(SC ~ agecenter+agecenter.sq,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                             filter(!is.na(SC),
-                                     !is.na(agecenter)))
-
-anova(null_model_SC_age, lin_model_SC_age, quad_model_SC_age)
-
-#Q2: How much do prior levels of self-reported mindfulness predict self-perceived scholastic competence?
-
-#removing wave 1 from graph since time-lagged 
-
-try <- full_dataset %>% 
-  filter(!(wave %in% c("1"))) 
-  
-# graph for question 2
-
-CAMMlag_by_SC<-ggplot(data=try,
-       aes(x=CAMM_lag,
-           y=SC))+
-  xlim(0,40)+
-  xlab("CAMM (prior timepoint)")+
-  ylim(5,20)+
-  ylab("Scholastic Competence")+
-  geom_line(aes(group=id),size=.3,alpha=0.3)+
-  geom_point(aes(group=id,colour=wave, shape=wave),size=2,alpha=0.3)+
-  geom_smooth(method='lm', formula= y~x)+
-  theme(axis.title = element_text(face = "bold"), legend.text = element_text(face = "bold"), legend.title = element_text(face = "bold")) +
-  scale_colour_manual(name = "Wave",labels=c("2","3"), values= c("#E7B800", "#FC4E07"))+
-   scale_shape(name= "Wave",
-              labels=c("2",
-                       "3")) + theme_minimal()
-
-#saving graph for question 2
-
-ggsave("CAMM_by_SC.tiff",
-      plot=CAMMlag_by_SC,
-      bg = "transparent",
-      width= 6, height=4, units= 'in', dpi=600)
-
-# First thing is to report comparing null model to one including prior CAMM as predictor
-# with prior SC as covariate
-  
-# Null model filtering NAs in lags and contemporaneous measures of SC and CAMM without covariates
-
-null_model_SC<-lme(SC ~ 1,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(CAMM_lag),
-                                     !is.na(SC_lag)))
-
-# Linear model of prior CAMM predicting SC after controlling for prior SC
-
-lin_model_SC_CAMM<-lme(SC ~ SC_lag + CAMM_lag,
-                      method = "ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(SC_lag),
-                                     !is.na(CAMM_lag)))
-
-# Comapre null to linear model w/ predictors and the linear model is better
-anova(null_model_SC,lin_model_SC_CAMM)
-summary(lin_model_SC_CAMM)
-
-# Now, examine with all the preregistered covariates included
-null_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche,
-                        method="ML",
-                        random = ~1|id,
-                        data=full_dataset %>% 
-                          filter(!is.na(SC),
-                                 !is.na(SES),
-                                 !is.na(CAMM_lag),
-                                  !is.na(SC_lag),
-                                 !is.na(Age_at_Menarche)))
-
-lin_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+SC_lag+CAMM_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(CAMM_lag),
-                                !is.na(Age_at_Menarche)))
-
-lin_model_SC_covariates<-(lme(SC ~ SES+Age_at_Menarche+SC_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(CAMM_lag),
-                                !is.na(Age_at_Menarche))))
-summary(lin_model_SC_CAMM)
-anova(null_model_SC_CAMM_covariates,lin_model_SC_covariates,lin_model_SC_CAMM_covariates)
-anova(lin_model_SC_CAMM_covariates)
-
-############################################
-# #### Subsequent exploratory examination to see what maybe driving the lack of relationship between
-# # prior CAMM and SC when SC_lag is added but only in the non-covariate model
-# 
-# # Null model filtering NAs in contemporaneous measures of SC and CAMM
- null_model_contempSC<-lme(SC ~ 1,
-                      method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(CAMM_lag),
-                                      !is.na(SC_lag)))
-## grades and sppa-sc
-
-lin_model_aa_SC <- lme(SC ~ Grades, 
-                        method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(Grades)))
-
-## Linear model of prior CAMM predicting SC
- null_model_camm <- lme(SC ~ 1,
-                       method ="ML",
-                       random = ~1|id,
-                       data = full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(SC_lag),
-                                      !is.na(CAMM_lag)))
- lin_model_CAMM<-lme(SC ~ CAMM_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(SC_lag),
-                                      !is.na(CAMM_lag)))
-# # Linear model of prior SC predicting SC
- lin_model_baselinSC<-lme(SC ~ SC_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                                filter(!is.na(SC),
-                                       !is.na(SC_lag),
-                                       !is.na(CAMM_lag)))
- 
-# # Linear model of CAMM predicting SC (contemporaneous measurements)
-
-  lin_model_contempSC_CAMM<-lme(SC ~ CAMM,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(CAMM),
-                                      !is.na(CAMM_lag),
-                                      !is.na(SC_lag)))
- 
- lin_model_SC_CAMM_controlled<-lme(SC ~ SC_lag + CAMM_lag + CAMM,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>%
-                               filter(!is.na(SC),
-                                      !is.na(CAMM),
-                                      !is.na(CAMM_lag),
-                                      !is.na(SC_lag)))
- 
-# 
-# # Compare basic null to contemporaneous measurements model
-# anova(null_model_contempSC,lin_model_contempSC_CAMM,lin_model_SC_CAMM_controlled)
-# summary(lin_model_SC_CAMM_controlled)
-
- #Q3: Are levels of scholastic competence predicted by transitioning into middle school or high school?
-
- # Transition recoded 0=1, 1=2, 0=2=0 and then 1=TranMiddle; 0=NoTran; 2=TranHigh
-
- full_dataset <- full_dataset%>%
+full_dataset <- full_dataset%>%
   mutate(Transition=ifelse(Transition==0, 1,
                            ifelse(Transition==1, 2,
                                   ifelse(Transition==2,0,
                               Transition)))) %>%
   mutate(Transition=as.factor(Transition))
- 
-# use in analysis, don't use to make table 1 
-# full_dataset<-full_dataset %>%
-#  mutate(Transition=ifelse(Transition==1,"TranMiddle",
-                          # ifelse(Transition==0,"NoTran",
-                                #  ifelse(Transition==2,"TranHigh",
-                          # Transition)))) %>%
- # mutate(Transition=as.factor(Transition))
 
-#levels(full_dataset$Transition)
+## recoding to make transition var readable
 
-null_model_SC_Transition<-lme(SC ~ 1,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                !is.na(SC_lag),
-                                !is.na(Transition)))
+full_dataset<-full_dataset %>%
+mutate(Transition=ifelse(Transition==1,"TranMiddle",
+                          ifelse(Transition==0,"NoTran",
+                                 ifelse(Transition==2,"TranHigh",
+                          Transition)))) %>%
+ mutate(Transition=as.factor(Transition))
 
-lin_model_SC_Transition<-lme(SC ~ SC_lag + Transition,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                !is.na(SC_lag),
-                                !is.na(Transition)))
-
-summary(lin_model_SC_Transition)
-anova(null_model_SC_Transition,lin_model_SC_Transition)
-
-# plotting transitions with covariates 
-
-data = full_dataset %>% 
-  filter(!is.na(SC),
-         !is.na(SES),
-         !is.na(Transition),
-         !is.na(Age_at_Menarche))
-
-# get predicted values for each individual and the fixed effect 
-
-model_to_plot = lmer(SC ~ SES + Age_at_Menarche + SC_lag + Transition + (1|id), data = data)
-
-# get mean ages per transition
-
-age_means = data %>%
-  group_by(Transition) %>%
-  summarize(Age_at_Wave = mean(Age_at_Wave, na.rm = TRUE))
-
-# use fixed effect CIs from the model
-
-cis = ggeffects::ggpredict(model_to_plot, c("Transition")) %>%
-  data.frame() %>%
-  rename("Transition" = x) %>%
-  left_join(., age_means)
-
-#plot against age
-
-transitions <- ggplot(data=data,
-       aes(x=Age_at_Wave,
-           y=SC))+
-  xlab("Age (years)")+
-  ylab("Scholastic Competence")+
-  geom_line(aes(group=id,colour=Transition),size=.3,alpha=0.3)+
-  geom_point(aes(group=id,colour=Transition, shape=Transition),size=2,alpha=0.3)+
-  geom_crossbar(data = cis, aes(x = Age_at_Wave, y = predicted, color = Transition,
-                           ymin = conf.low, ymax = conf.high), width = 0.4) +
-  scale_color_manual(name="Transition",
-                     labels= c("No Transition",
-                               "Middle School",
-                               "High School"),
-                     values = c("orange", "purple", "blue")) +
-  scale_shape(name= "Transition",
-              labels=c("No Transition",
-                       "Middle School",
-                       "High School")) +
-  theme(legend.position="bottom",
-        legend.box = "horizontal",
-        axis.title = element_text(face = "bold"),
-        legend.text = element_text(face = "bold"),
-        legend.title = element_text(face = "bold")) +
-  theme_minimal()
-  
-ggsave("Transitions_by_SC.tiff", units= 'in', dpi=600, bg = "transparent")
-
-## Add covariates
-
-null_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche,
-                        method="ML",
-                        random = ~1|id,
-                        data=full_dataset %>% 
-                          filter(!is.na(SC),
-                                 !is.na(SES),
-                                 !is.na(SC_lag),
-                                 !is.na(Transition),
-                                 !is.na(Age_at_Menarche)))
-
-lin_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+SC_lag+Transition,
-                       method = "ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(Transition),
-                                !is.na(Age_at_Menarche)))
-summary(lin_SC_Transition_covariates)
-anova(null_SC_Transition_covariates,lin_SC_Transition_covariates)
+levels(full_dataset$Transition)
 ```
 
 
-Adding academic acheivement (grades) to analyses as covariate
-```{r}
-# making a mean centered age variable 
+```{r Descriptives Table}
 
-full_dataset$agecenter<-(full_dataset$Age_at_Wave-12.5)
-full_dataset$agecenter.sq<-(full_dataset$agecenter*full_dataset$agecenter)
-
-
-#Q1: Does self-perceived scholastic competence change across early adolescence in girls?  
-null_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+Grades,
-                      method="ML",
-                      random = ~1 | id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche),
-                                     !is.na(Grades)))
-lin_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter+Grades,
-                      method="ML",
-                      random = ~1 | id,
-                      data=full_dataset %>% 
-                              filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche),
-                                     !is.na(Grades)))
-summary(lin_model_SC_age_cov)
-
-quad_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+Grades+agecenter+agecenter.sq,
-                      method="ML",
-                      random = ~1|id,
-                      data=full_dataset %>% 
-                             filter(!is.na(SC),
-                                     !is.na(agecenter),
-                                     !is.na(SES),
-                                     !is.na(Age_at_Menarche),
-                                    !is.na(Grades)))
-
-# question 2 w/ grades
-null_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades,
-                        method="ML",
-                        random = ~1|id,
-                        data=full_dataset %>% 
-                          filter(!is.na(SC),
-                                 !is.na(SES),
-                                 !is.na(CAMM_lag),
-                                  !is.na(SC_lag),
-                                 !is.na(Age_at_Menarche),
-                                 !is.na(Grades)
-                              ))
-
-lin_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades+SC_lag+CAMM_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(CAMM_lag),
-                                !is.na(Age_at_Menarche),
-                                !is.na(Grades)))
-
-lin_model_SC_covariates<-(lme(SC ~ SES+Age_at_Menarche+SC_lag,
-                       method="ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(CAMM_lag),
-                                !is.na(Age_at_Menarche))))
-summary(lin_model_SC_CAMM)
-anova(null_model_SC_CAMM_covariates,lin_model_SC_covariates,lin_model_SC_CAMM_covariates)
-anova(lin_model_SC_CAMM_covariates)
-
-# question three w/ grades
-null_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades,
-                        method="ML",
-                        random = ~1|id,
-                        data=full_dataset %>% 
-                          filter(!is.na(SC),
-                                 !is.na(SES),
-                                 !is.na(SC_lag),
-                                 !is.na(Transition),
-                                 !is.na(Age_at_Menarche),
-                                 !is.na(Grades)))
-
-lin_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades+SC_lag+Transition,
-                       method = "ML",
-                       random = ~1|id,
-                       data=full_dataset %>% 
-                         filter(!is.na(SC),
-                                !is.na(SES),
-                                !is.na(SC_lag),
-                                !is.na(Transition),
-                                !is.na(Age_at_Menarche),
-                                !is.na(Grades)))
-
-stargazer(null_model_SC_CAMM_covariates, lin_model_SC_CAMM_covariates, null_SC_Transition_covariates, lin_SC_Transition_covariates, column.labels = c("Mindfulness", "School Transitions"), column.separate = c(2, 2),type = "html", out="~/path")
-
-### trying to figure out how to run sppa predicting grades 
-
-install.packages("ordinal")
-install.packages("devtools")
-library("ordinal")
-install.packages("texreg")
-library("texreg")
-
-full_dataset$Grades_ordered <- as.ordered(full_dataset$Grades)
-sppa_grades <- clmm(Grades_ordered ~ SC_lag + (1 | id), data = full_dataset, link = "logit", Hess=TRUE) 
-
-## look at concurrent SPPA-SC too, report z-value & p of both
-grades_sppa <- clmm(Grades_ordered ~ SC + (1 | id), data = full_dataset, Hess=TRUE) 
-
-##nulls 
-sppa_grades.null <- clmm(Grades_ordered ~ 1 + (1 | id), data = full_dataset, Hess = TRUE)
-grades_sppa.null <- clmm(Grades_ordered ~ 1 + (1 | id), data = full_dataset, Hess=TRUE) 
-
-(ci <- confint(sppa_grades))
-exp(cbind(OR = coef(sppa_grades), ci))
-ctable <- exp(coef(sppa_grades))
-
-(ci <- confint(grades_sppa))
-exp(cbind(OR = coef(grades_sppa), ci))
-ctable <- exp(coef(grades_sppa))
-```
-
-
-
-
-Creating Descriptive Tables 
-```{r}
 library(dplyr)
 
 descriptives_CAMM <- full_dataset %>% group_by(wave) %>%
@@ -811,6 +338,7 @@ descriptives_SC <- full_dataset %>% group_by(wave) %>%
     , Min = min(SC, na.rm = TRUE)
     , Max = max(SC, na.rm = TRUE)
   )
+
 descriptives_age <- full_dataset %>% group_by(wave) %>%
   summarize(
     Mean = mean(Age_at_Wave, na.rm= TRUE)
@@ -836,7 +364,503 @@ full_dataset$Transition <-
 label(full_dataset$Age_at_Wave) <- "Age"
 label(full_dataset$CAMM) <- "Child and Adolescent Mindfulnes Measure scores"
 label(full_dataset$SC) <- "Self-Perceived Scholastic Competence"
+
 units(full_dataset$Age_at_Wave) <- "years"
 
-table1(~ Transition + Age_at_Wave + CAMM + SC | wave, data=full_dataset, overall = "Total", topclass = "Rtable1-grid Rtable1-shade Rtable1-times")
+table1(~ Transition + Age_at_Wave + CAMM + SC | wave, data=full_dataset, overall = "Total", output = "html")
+
+```
+
+```{r Question 1}
+
+#Q1: Does self-perceived scholastic competence change across early adolescence in girls?
+
+null_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche)))
+
+lin_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche)))
+
+summary(lin_model_SC_age_cov)
+
+quad_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter+agecenter.sq,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                             filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche)))
+
+summary(quad_model_SC_age_cov)
+
+anova(null_model_SC_age_cov,lin_model_SC_age_cov, quad_model_SC_age_cov)
+
+# question 1 without covariates
+
+null_model_SC_age<-lme(SC ~ 1,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter)))
+
+lin_model_SC_age<-lme(SC ~ agecenter,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter)))
+
+quad_model_SC_age<-lme(SC ~ agecenter+agecenter.sq,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                             filter(!is.na(SC),
+                                     !is.na(agecenter)))
+
+anova(null_model_SC_age, lin_model_SC_age, quad_model_SC_age)
+```
+
+```{r Question 2}
+
+#Q2: How much do prior levels of self-reported mindfulness predict self-perceived scholastic competence?
+
+null_model_SC<-lme(SC ~ 1,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(CAMM_lag),
+                                     !is.na(SC_lag)))
+
+
+lin_model_SC_CAMM<-lme(SC ~ SC_lag + CAMM_lag,
+                      method = "ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(SC_lag),
+                                     !is.na(CAMM_lag)))
+
+anova(null_model_SC,lin_model_SC_CAMM)
+summary(lin_model_SC_CAMM)
+
+## with covariates
+
+null_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche,
+                        method="ML",
+                        random = ~1|id,
+                        data=full_dataset %>%
+                          filter(!is.na(SC),
+                                 !is.na(SES),
+                                 !is.na(CAMM_lag),
+                                  !is.na(SC_lag),
+                                 !is.na(Age_at_Menarche)
+                              ))
+
+lin_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+SC_lag+CAMM_lag,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                         filter(!is.na(SC),
+                                !is.na(SES),
+                                !is.na(SC_lag),
+                                !is.na(CAMM_lag),
+                                !is.na(Age_at_Menarche)))
+
+summary(lin_model_SC_CAMM)
+
+```
+
+```{r Question 3}
+# 
+# #Q3: Are levels of scholastic competence predicted by transitioning into middle school or high school?
+
+null_model_SC_Transition<-lme(SC ~ 1,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                !is.na(SC_lag),
+                                !is.na(Transition)))
+
+lin_model_SC_Transition<-lme(SC ~ SC_lag + Transition,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                !is.na(SC_lag),
+                                !is.na(Transition)))
+
+summary(lin_model_SC_Transition)
+
+anova(null_model_SC_Transition,lin_model_SC_Transition)
+
+## Add covariates
+
+null_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche,
+                        method="ML",
+                        random = ~1|id,
+                        data=full_dataset %>%
+                          filter(!is.na(SC),
+                                 !is.na(SES),
+                                 !is.na(SC_lag),
+                                 !is.na(Transition),
+                                 !is.na(Age_at_Menarche)))
+
+lin_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+SC_lag+Transition,
+                       method = "ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                         filter(!is.na(SC),
+                                !is.na(SES),
+                                !is.na(SC_lag),
+                                !is.na(Transition),
+                                !is.na(Age_at_Menarche)))
+
+summary(lin_SC_Transition_covariates)
+anova(null_SC_Transition_covariates,lin_SC_Transition_covariates)
+```
+
+```{r Post-hoc analyses}
+
+# #### Subsequent exploratory examination to see what maybe driving the lack of relationship between
+# # prior CAMM and SC when SC_lag is added but only in the non-covariate model
+#
+# # Null model filtering NAs in contemporaneous measures of SC and CAMM
+ 
+null_model_contempSC<-lme(SC ~ 1,
+                      method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(CAMM_lag),
+                                      !is.na(SC_lag)))
+
+## Academic achievement and self-perceived scholastic competence
+
+null_model_aa_SC <- lme(SC ~ 1,
+                        method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(Grades)))
+lin_model_aa_SC <- lme(SC ~ Grades,
+                        method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(Grades)))
+
+## SES and self-perceived scholastic competence
+
+null_model_ses_SC <- lme(SC ~ 1,
+                        method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(SES)))
+
+lin_model_ses_SC <- lme(SC ~ SES,
+                        method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(SES)))
+
+## Linear model of prior CAMM predicting SC
+ 
+null_model_camm <- lme(SC ~ 1,
+                       method ="ML",
+                       random = ~1|id,
+                       data = full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(SC_lag),
+                                      !is.na(CAMM_lag)))
+ 
+lin_model_CAMM<-lme(SC ~ CAMM_lag,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(SC_lag),
+                                      !is.na(CAMM_lag)))
+
+ # # Linear model of prior SC predicting SC
+ 
+ lin_model_baselinSC<-lme(SC ~ SC_lag,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                                filter(!is.na(SC),
+                                       !is.na(SC_lag),
+                                       !is.na(CAMM_lag)))
+
+ ## Linear model of CAMM predicting SC (contemporaneous measurements)
+ 
+ lin_model_contempSC_CAMM<-lme(SC ~ CAMM,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                               filter(!is.na(SC),
+                                      !is.na(CAMM),
+                                      !is.na(CAMM_lag),
+                                      !is.na(SC_lag)))
+
+# # Compare basic null to contemporaneous measurements model
+# anova(null_model_contempSC,lin_model_contempSC_CAMM,lin_model_SC_CAMM_controlled)
+# summary(lin_model_SC_CAMM_controlled)
+ 
+```
+
+```{r Visualizations}
+
+# graph for question 1
+
+age_by_SC<-ggplot(data=full_dataset,
+       aes(x=Age_at_Wave,
+           y=SC))+
+  xlim(9.5,16.5)+
+  xlab("Age (years)")+
+  ylim(5,20)+
+  ylab("Scholastic Competence")+
+  geom_line(aes(group=id),size=.5,alpha=0.3,colour="#82204A")+
+  geom_point(aes(group=id),size=3,alpha=0.3,colour="#82204A")+
+  theme(axis.title = element_text(face = "bold")) +
+  theme_minimal()
+
+age_by_SC
+
+# saving graph as tiff
+ggsave("Age_by_SC.tiff", width= 6, height=4, units= 'in', dpi=600, bg = "transparent")
+
+# removing wave 1 from graph since time-lagged
+
+try <- full_dataset %>%
+  filter(!(wave %in% c("1")))
+
+# graph for question 2
+
+CAMMlag_by_SC<-ggplot(data=try,
+       aes(x=CAMM_lag,
+           y=SC))+
+  xlim(0,40)+
+  xlab("CAMM (prior timepoint)")+
+  ylim(5,20)+
+  ylab("Scholastic Competence")+
+  geom_line(aes(group=id),size=.3,alpha=0.3)+
+  geom_point(aes(group=id,colour=wave, shape=wave),size=2,alpha=0.3)+
+  geom_smooth(method='lm', formula= y~x)+
+  theme(axis.title = element_text(face = "bold"), legend.text = element_text(face = "bold"), legend.title = element_text(face = "bold")) +
+  scale_colour_manual(name = "Wave",labels=c("2","3"), values= c("#E7B800", "#FC4E07"))+
+   scale_shape(name= "Wave",
+              labels=c(
+                       "2",
+                       "3")) + theme_minimal()
+
+#saving graph for question 2
+
+ggsave("CAMM_by_SC.tiff",
+      plot=CAMMlag_by_SC,
+      bg = "transparent",
+      width= 6, height=4, units= 'in', dpi=600)
+
+# plotting transitions with covariates
+data = full_dataset %>%
+  filter(!is.na(SC),
+         !is.na(SES),
+         !is.na(Transition),
+         !is.na(Age_at_Menarche))
+
+# get predicted values for each individual and the fixed effect
+
+model_to_plot = lmer(SC ~ SES + Age_at_Menarche + SC_lag + Transition + (1|id), data = data)
+
+# get mean ages per transition
+
+age_means = data %>%
+  group_by(Transition) %>%
+  summarize(Age_at_Wave = mean(Age_at_Wave, na.rm = TRUE))
+
+# use fixed effect CIs from the model
+
+cis = ggeffects::ggpredict(model_to_plot, c("Transition")) %>%
+  data.frame() %>%
+  rename("Transition" = x) %>%
+  left_join(., age_means)
+
+# plot against age
+
+transitions <- ggplot(data=data,
+       aes(x=Age_at_Wave,
+           y=SC))+
+  xlab("Age (years)")+
+  ylab("Scholastic Competence")+
+  geom_line(aes(group=id,colour=Transition),size=.3,alpha=0.3)+
+  geom_point(aes(group=id,colour=Transition, shape=Transition),size=2,alpha=0.3)+
+  geom_crossbar(data = cis, aes(x = Age_at_Wave, y = predicted, color = Transition,
+                           ymin = conf.low, ymax = conf.high), width = 0.4) +
+  scale_color_manual(name="Transition",
+                     labels= c("No Transition",
+                               "Middle School",
+                               "High School"),
+                     values = c("orange", "purple", "blue")) +
+  scale_shape(name= "Transition",
+              labels=c("No Transition",
+                       "Middle School",
+                       "High School")) +
+  theme(legend.position="bottom",
+        legend.box = "horizontal",
+        axis.title = element_text(face = "bold"),
+        legend.text = element_text(face = "bold"),
+        legend.title = element_text(face = "bold")) +
+  theme_minimal()
+
+ggsave("Transitions_by_SC.tiff", units= 'in', dpi=600, bg = "transparent")
+```
+
+```{r Repeat all 3 questions w/ inclusion of academic acheivement}
+
+#Q1: Does self-perceived scholastic competence change across early adolescence in girls?
+
+null_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+Grades,
+                      method="ML",
+                      random = ~1 | id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche),
+                                     !is.na(Grades)))
+
+lin_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+agecenter+Grades,
+                      method="ML",
+                      random = ~1 | id,
+                      data=full_dataset %>%
+                              filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche),
+                                     !is.na(Grades)))
+
+summary(lin_model_SC_age_cov)
+
+quad_model_SC_age_cov<-lme(SC ~ SES+Age_at_Menarche+Grades+agecenter+agecenter.sq,
+                      method="ML",
+                      random = ~1|id,
+                      data=full_dataset %>%
+                             filter(!is.na(SC),
+                                     !is.na(agecenter),
+                                     !is.na(SES),
+                                     !is.na(Age_at_Menarche),
+                                    !is.na(Grades)))
+
+# question 2 w/ grades
+
+null_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades,
+                        method="ML",
+                        random = ~1|id,
+                        data=full_dataset %>%
+                          filter(!is.na(SC),
+                                 !is.na(SES),
+                                 !is.na(CAMM_lag),
+                                  !is.na(SC_lag),
+                                 !is.na(Age_at_Menarche),
+                                 !is.na(Grades)
+                              ))
+
+lin_model_SC_CAMM_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades+SC_lag+CAMM_lag,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                         filter(!is.na(SC),
+                                !is.na(SES),
+                                !is.na(SC_lag),
+                                !is.na(CAMM_lag),
+                                !is.na(Age_at_Menarche),
+                                !is.na(Grades)))
+
+lin_model_SC_covariates<-(lme(SC ~ SES+Age_at_Menarche+SC_lag,
+                       method="ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                         filter(!is.na(SC),
+                                !is.na(SES),
+                                !is.na(SC_lag),
+                                !is.na(CAMM_lag),
+                                !is.na(Age_at_Menarche))))
+
+summary(lin_model_SC_CAMM)
+
+# question three w/ grades
+
+null_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades,
+                        method="ML",
+                        random = ~1|id,
+                        data=full_dataset %>%
+                          filter(!is.na(SC),
+                                 !is.na(SES),
+                                 !is.na(SC_lag),
+                                 !is.na(Transition),
+                                 !is.na(Age_at_Menarche),
+                                 !is.na(Grades)))
+
+lin_SC_Transition_covariates<-lme(SC ~ SES+Age_at_Menarche+Grades+SC_lag+Transition,
+                       method = "ML",
+                       random = ~1|id,
+                       data=full_dataset %>%
+                         filter(!is.na(SC),
+                                !is.na(SES),
+                                !is.na(SC_lag),
+                                !is.na(Transition),
+                                !is.na(Age_at_Menarche),
+                                !is.na(Grades)))
+
+
+### run sppa predicting grades
+
+install.packages("ordinal")
+
+install.packages("devtools")
+
+library("ordinal")
+
+install.packages("texreg")
+
+library("texreg")
+
+full_dataset$Grades_ordered <- as.ordered(full_dataset$Grades)
+
+sppa_grades <- clmm(Grades_ordered ~ SC_lag + (1 | id), data = full_dataset, link = "logit", Hess=TRUE)
+
+## look at concurrent SPPA-SC too, report z-value & p of both
+
+grades_sppa <- clmm(Grades_ordered ~ SC + (1 | id), data = full_dataset, Hess=TRUE)
+
+##nulls
+
+sppa_grades.null <- clmm(Grades_ordered ~ 1 + (1 | id), data = full_dataset, Hess = TRUE)
+grades_sppa.null <- clmm(Grades_ordered ~ 1 + (1 | id), data = full_dataset, Hess=TRUE)
+
+(ci <- confint(sppa_grades))
+exp(cbind(OR = coef(sppa_grades), ci))
+ctable <- exp(coef(sppa_grades))
+
+(ci <- confint(grades_sppa))
+exp(cbind(OR = coef(grades_sppa), ci))
+ctable <- exp(coef(grades_sppa))
+
 ```
